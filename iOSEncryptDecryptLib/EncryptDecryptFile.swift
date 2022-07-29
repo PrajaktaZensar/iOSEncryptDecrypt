@@ -22,14 +22,24 @@ public class CryptoKitClass {
             self.passowrdString = passowrdString
     }
     
-    public func encryptFunc(passowrdString: String) throws -> String {
+/*------------------ENCRYPTING/DECRYPTING DATA---------------------------
+
+--------------- You can encrypt the contents of super secret msg--------
+--------------- AES with Galois/Counter Mode (AES-GCM) provides both authenticated encryption (confidentiality and authentication) and the ability to check the integrity and authentication of additional authenticated data (AAD) that is sent in the clear.
+
+------------------ENCRYPTING/DECRYPTING DATA---------------------------*/
+    
+    
+    public func AESencryptFunc(passowrdString: String) throws -> String {
         let textData = passowrdString.data(using: .utf8)!
         let encrypted = try AES.GCM.seal(textData, using: randomKey)
         encryptedData = encrypted.combined!.base64EncodedString()
         return encryptedData
     }
+    
+    
 
-    public func decryptFunc() -> String {
+    public func AESdecryptFunc() -> String {
         do {
             guard let data = Data(base64Encoded: try encryptedData) else {
                 return "Could not decode text: \(passowrdString ?? "")"
@@ -48,30 +58,33 @@ public class CryptoKitClass {
         }
     }
     
-    
-/*------------------AUTHENTICATE---------------------------
+//------------------------------------------------------------------------------
+/*----------------------------AUTHENTICATE--------------------------------------
 
 --------------- Hash-based Message Authentication Code
 --------------- The HMAC process mixes a secret key with the message data and hashes the result. The hash value is mixed with the secret key again, and then hashed a second time.
 
-------------------AUTHENTICATE---------------------------*/
-
+----------------------------AUTHENTICATE--------------------------------------*/
 
         // CrytoKit
-        public func hashHmacSHA512CryptoKit() -> String? {
+        public func authenticateHmacSHA512CryptoKit() -> String? {
             // Create the hash
             let passwordData = passowrdString.data(using: .utf8)!
             let symmetricKey = SymmetricKey(data: passwordData)
             let passwordHashDigest = HMAC<SHA512>.authenticationCode(for: passwordData, using: symmetricKey)
             return formatPassword(Data(passwordHashDigest))
         }
-
-/*----------------------HASHING-----------------------------
+    
+    
+    
+    
+//------------------------------------------------------------------------------
+/*----------------------------HASHING--------------------------------------
  
 --------------- Hashing algorithm used to convert text of any length into a fixed-size string.
 --------------- Each output produces a SHA-512 length of 512 bits (64 bytes). This algorithm is commonly used for email addresses hashing, password hashing, and digital record verification.
  
-----------------------HASHING-----------------------------*/
+----------------------------HASHING----------------------------------------*/
 
 
         // CrytoKit
@@ -81,6 +94,60 @@ public class CryptoKitClass {
             let passwordHashDigest = SHA512.hash(data: passwordData)
             return formatPassword(Data(passwordHashDigest))
         }
+    
+    
+    
+    
+    
+//------------------------------------------------------------------------------
+/*----------------------CREATING AND VERIFYING SIGNATURES-----------------------------
+     
+--------------- A signature that has been confirmed to be valid by a recipient, gives them a strong indication that the information was indeed created by the person claiming to have created it and hasn’t been tampered with
+--------------- Common public-key cryptography use cases are encryption and digital signatures.
+--------------- CryptoKit uses ECC algorithms exclusively. We can choose between the P256/P384/P521 ECC algorithm and the Curve25519 ECC algorithm. They both have approximately the same security level and small key sizes.
+ 
+     
+----------------------CREATING AND VERIFYING SIGNATURES-----------------------------*/
+    
+    
+    public func senderSignatureCurve25519() -> (Data, Data, SHA512Digest) {
+        let senderSigningPrivateKey = Curve25519.Signing.PrivateKey()
+       
+        let senderSigningPublicKeyData =
+        senderSigningPrivateKey.publicKey.rawRepresentation
+        //The rawRepresentation of the public key is of type Data, so you can send it over the network.
+
+        let data = "Data".data(using: .utf8)!
+        let digest512 = SHA512.hash(data: data)
+        let signatureForDigest = try! senderSigningPrivateKey.signature(
+          for: Data(digest512))
+        
+        
+        return (senderSigningPublicKeyData, signatureForDigest, digest512)
+
+    }
+    
+    
+    public func receiverVerifySignatureCurve25519(publicKey : Data, signature: Data, SHA512Digest: SHA512Digest) -> Bool {
+        
+        let publicKeyVal = try! Curve25519.Signing.PublicKey(
+          rawRepresentation: publicKey)
+     
+        if publicKeyVal.isValidSignature(signature,
+          for: Data(SHA512Digest)) {
+            return true
+        } else {
+            return false
+        }
+    }
+    
+//------------------------------------------------------------------------------
+/*----------------------KEY AGREEMENT PROTOCOL ALGO-----------------------------
+    
+ A key agreement protocol is a process during which two parties securely choose a shared encryption key that can be used to sign and encrypt the data they want to share with each other. This also allows unauthorized parties to access the data.
+    
+----------------------KEY AGREEMENT PROTOCOL ALGO-----------------------------*/
+    
 
         // Common Password Format
         func formatPassword(_ password: Data) -> String {
@@ -98,180 +165,125 @@ public class CryptoKitClass {
 }
 
 
-// -------- For Common Crypto -----------
-
-
-protocol Cryptable {
-    func encrypt(_ string: String) throws -> Data
-    func decrypt(_ data: Data) throws -> String
-}
-
-public class CommonCryptoKitClass : Cryptable {
-
-     private let key: Data
-     private let ivSize: Int         = kCCBlockSizeAES128
-     private let options: CCOptions  = CCOptions(kCCOptionPKCS7Padding)
-
-    public init(keyString: String) throws {
-        guard keyString.count == kCCKeySizeAES256 else {
-            throw Error.invalidKeySize
+public class PinningManager: NSObject {
+    
+    var publicKeyHash = ""
+    var certificateName = ""
+    
+    public init(publicKeyHash : String, certificateName: String) {
+        self.publicKeyHash = publicKeyHash
+        self.certificateName = certificateName
+    }
+    
+    let rsa2048Asn1Header:[UInt8] = [
+        0x30, 0x82, 0x01, 0x22, 0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86,
+        0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00, 0x03, 0x82, 0x01, 0x0f, 0x00
+    ]
+    
+    private var isCertificatePinning: Bool = false
+    
+    private func sha256(data : Data) -> String {
+        var keyWithHeader = Data(rsa2048Asn1Header)
+        keyWithHeader.append(data)
+        var hash = [UInt8](repeating: 0,  count: Int(CC_SHA256_DIGEST_LENGTH))
+        
+        keyWithHeader.withUnsafeBytes {
+            _ = CC_SHA256($0, CC_LONG(keyWithHeader.count), &hash)
         }
-        self.key = Data(keyString.utf8)
+        
+        
+        return Data(hash).base64EncodedString()
     }
     
-// CommonCrypto
-//    public func hashSha512CommonCrypto() -> String? {
-//        // Create the password hash
-//        var digest = Data(count: Int(CC_SHA512_DIGEST_LENGTH))
-//        digest.withUnsafeMutableBytes {mutableBytes in
-//            CC_SHA512(passowrdString, CC_LONG(passowrdString.utf8.count), mutableBytes.bindMemory(to: UInt8.self).baseAddress)
-//        }
-//        return formatPassword(digest)
-//    }
-//
-//
-//    public func hashHmacSHA512CommonCrypto() -> String? {
-//        // Create the password hash
-//        var digest = Data(count: Int(CC_SHA512_DIGEST_LENGTH))
-//        digest.withUnsafeMutableBytes {mutableBytes in
-//            CCHmac(CCHmacAlgorithm(kCCHmacAlgSHA512), passowrdString, passowrdString.utf8.count, passowrdString, passowrdString.utf8.count, mutableBytes.baseAddress)
-//        }
-//        return formatPassword(digest)
-//    }
-    
-   public func encrypt(_ string: String) throws -> Data {
-       let dataToEncrypt = Data(string.utf8)
-
-       let bufferSize: Int = ivSize + dataToEncrypt.count + kCCBlockSizeAES128
-       var buffer = Data(count: bufferSize)
-       try generateRandomIV(for: &buffer)
-
-       var numberBytesEncrypted: Int = 0
-
-       do {
-           try key.withUnsafeBytes { keyBytes in
-               try dataToEncrypt.withUnsafeBytes { dataToEncryptBytes in
-                   try buffer.withUnsafeMutableBytes { bufferBytes in
-
-                       guard let keyBytesBaseAddress = keyBytes.baseAddress,
-                           let dataToEncryptBytesBaseAddress = dataToEncryptBytes.baseAddress,
-                           let bufferBytesBaseAddress = bufferBytes.baseAddress else {
-                               throw Error.encryptionFailed
-                       }
-
-                       let cryptStatus: CCCryptorStatus = CCCrypt( // Stateless, one-shot encrypt operation
-                           CCOperation(kCCEncrypt),                // op: CCOperation
-                           CCAlgorithm(kCCAlgorithmAES),           // alg: CCAlgorithm
-                           options,                                // options: CCOptions
-                           keyBytesBaseAddress,                    // key: the "password"
-                           key.count,                              // keyLength: the "password" size
-                           bufferBytesBaseAddress,                 // iv: Initialization Vector
-                           dataToEncryptBytesBaseAddress,          // dataIn: Data to encrypt bytes
-                           dataToEncryptBytes.count,               // dataInLength: Data to encrypt size
-                           bufferBytesBaseAddress + ivSize,        // dataOut: encrypted Data buffer
-                           bufferSize,                             // dataOutAvailable: encrypted Data buffer size
-                           &numberBytesEncrypted                   // dataOutMoved: the number of bytes written
-                       )
-
-                       guard cryptStatus == CCCryptorStatus(kCCSuccess) else {
-                           throw Error.encryptionFailed
-                       }
-                   }
-               }
-           }
-
-       } catch {
-           throw Error.encryptionFailed
-       }
-
-       let encryptedData: Data = buffer[..<(numberBytesEncrypted + ivSize)]
-       return encryptedData
-   }
-
-   public func decrypt(_ data: Data) throws -> String {
-
-       let bufferSize: Int = data.count - ivSize
-       var buffer = Data(count: bufferSize)
-
-       var numberBytesDecrypted: Int = 0
-
-       do {
-           try key.withUnsafeBytes { keyBytes in
-               try data.withUnsafeBytes { dataToDecryptBytes in
-                   try buffer.withUnsafeMutableBytes { bufferBytes in
-
-                       guard let keyBytesBaseAddress = keyBytes.baseAddress,
-                           let dataToDecryptBytesBaseAddress = dataToDecryptBytes.baseAddress,
-                           let bufferBytesBaseAddress = bufferBytes.baseAddress else {
-                               throw Error.encryptionFailed
-                       }
-
-                       let cryptStatus: CCCryptorStatus = CCCrypt( // Stateless, one-shot encrypt operation
-                           CCOperation(kCCDecrypt),                // op: CCOperation
-                           CCAlgorithm(kCCAlgorithmAES128),        // alg: CCAlgorithm
-                           options,                                // options: CCOptions
-                           keyBytesBaseAddress,                    // key: the "password"
-                           key.count,                              // keyLength: the "password" size
-                           dataToDecryptBytesBaseAddress,          // iv: Initialization Vector
-                           dataToDecryptBytesBaseAddress + ivSize, // dataIn: Data to decrypt bytes
-                           bufferSize,                             // dataInLength: Data to decrypt size
-                           bufferBytesBaseAddress,                 // dataOut: decrypted Data buffer
-                           bufferSize,                             // dataOutAvailable: decrypted Data buffer size
-                           &numberBytesDecrypted                   // dataOutMoved: the number of bytes written
-                       )
-
-                       guard cryptStatus == CCCryptorStatus(kCCSuccess) else {
-                           throw Error.decryptionFailed
-                       }
-                   }
-               }
-           }
-       } catch {
-           throw Error.encryptionFailed
-       }
-
-       let decryptedData: Data = buffer[..<numberBytesDecrypted]
-
-       guard let decryptedString = String(data: decryptedData, encoding: .utf8) else {
-           throw Error.dataToStringFailed
-       }
-
-       return decryptedString
-   }
-
-}
-
-extension CommonCryptoKitClass {
-    enum Error: Swift.Error {
-        case invalidKeySize
-        case generateRandomIVFailed
-        case encryptionFailed
-        case decryptionFailed
-        case dataToStringFailed
-    }
-}
-
-private extension CommonCryptoKitClass {
-
-    func generateRandomIV(for data: inout Data) throws {
-
-        try data.withUnsafeMutableBytes { dataBytes in
-
-            guard let dataBytesBaseAddress = dataBytes.baseAddress else {
-                throw Error.generateRandomIVFailed
+    func callAPI(withURL url: URL, isCertificatePinning: Bool, completion: @escaping (String) -> Void) {
+        let session = URLSession(configuration: .ephemeral, delegate: self, delegateQueue: nil)
+        self.isCertificatePinning = isCertificatePinning
+        var responseMessage = ""
+        let task = session.dataTask(with: url) { (data, response, error) in
+            if error != nil {
+                print("error: \(error!.localizedDescription): \(error!)")
+                responseMessage = "Pinning failed"
+            } else if data != nil {
+                let str = String(decoding: data!, as: UTF8.self)
+                print("Received data:\n\(str)")
+                if isCertificatePinning {
+                    responseMessage = "Certificate pinning is successfully completed"
+                }else {
+                    responseMessage = "Public key pinning is successfully completed"
+                }
             }
+            
+            DispatchQueue.main.async {
+                completion(responseMessage)
+            }
+            
+        }
+        task.resume()
+        
+    }
+    
+}
 
-            let status: Int32 = SecRandomCopyBytes(
-                kSecRandomDefault,
-                kCCBlockSizeAES128,
-                dataBytesBaseAddress
-            )
-
-            guard status == 0 else {
-                throw Error.generateRandomIVFailed
+extension PinningManager: URLSessionDelegate {
+    
+    public func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        
+        guard let serverTrust = challenge.protectionSpace.serverTrust else {
+            completionHandler(.cancelAuthenticationChallenge, nil);
+            return
+        }
+        
+        if self.isCertificatePinning {
+            
+            
+            let certificate = SecTrustGetCertificateAtIndex(serverTrust, 0)
+            // SSL Policies for domain name check
+            let policy = NSMutableArray()
+            policy.add(SecPolicyCreateSSL(true, challenge.protectionSpace.host as CFString))
+            
+            //evaluate server certifiacte
+            let isServerTrusted = SecTrustEvaluateWithError(serverTrust, nil)
+            
+            //Local and Remote certificate Data
+            let remoteCertificateData:NSData =  SecCertificateCopyData(certificate!)
+            //let LocalCertificate = Bundle.main.path(forResource: "github.com", ofType: "cer")
+            let pathToCertificate = Bundle.main.path(forResource: certificateName, ofType: "cer")
+            let localCertificateData:NSData = NSData(contentsOfFile: pathToCertificate!)!
+            
+            //Compare certificates
+            if(isServerTrusted && remoteCertificateData.isEqual(to: localCertificateData as Data)){
+                let credential:URLCredential =  URLCredential(trust:serverTrust)
+                print("Certificate pinning is successfully completed")
+                completionHandler(.useCredential,credential)
+            }
+            else{
+                completionHandler(.cancelAuthenticationChallenge,nil)
+            }
+        } else {
+            if let serverCertificate = SecTrustGetCertificateAtIndex(serverTrust, 0) {
+                // Server public key
+                let serverPublicKey = SecCertificateCopyKey(serverCertificate)
+                let serverPublicKeyData = SecKeyCopyExternalRepresentation(serverPublicKey!, nil )!
+                let data:Data = serverPublicKeyData as Data
+                // Server Hash key
+                let serverHashKey = sha256(data: data)
+                // Local Hash Key
+                let publickKeyLocal = self.publicKeyHash
+                if (serverHashKey == publickKeyLocal) {
+                    // Success! This is our server
+                    print("Public key pinning is successfully completed")
+                    completionHandler(.useCredential, URLCredential(trust:serverTrust))
+                    return
+                }
             }
         }
     }
 }
+
+
+
+
+
+
 
 
