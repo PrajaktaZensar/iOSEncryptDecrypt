@@ -195,7 +195,7 @@ public class PinningManager: NSObject {
         return Data(hash).base64EncodedString()
     }
     
-    func callAPI(withURL url: URL, isCertificatePinning: Bool, completion: @escaping (String) -> Void) {
+   public func callAPI(withURL url: URL, isCertificatePinning: Bool, completion: @escaping (String) -> Void) {
         let session = URLSession(configuration: .ephemeral, delegate: self, delegateQueue: nil)
         self.isCertificatePinning = isCertificatePinning
         var responseMessage = ""
