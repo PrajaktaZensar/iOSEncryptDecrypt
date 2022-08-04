@@ -11,7 +11,7 @@ import CryptoKit
 
 
 //-------- For Cryptokit-----------
-
+@available(iOS 13.0, *)
 public class CryptoKitClass {
 
     var passowrdString: String!
@@ -224,6 +224,7 @@ public class PinningManager: NSObject {
     
 }
 
+@available(iOS 12.0, *)
 extension PinningManager: URLSessionDelegate {
     
     public func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
