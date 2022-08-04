@@ -17,6 +17,7 @@ public class CryptoKitClass {
     var passowrdString: String!
     let randomKey = SymmetricKey(size: .bits256)
     var encryptedData: String!
+    public typealias KeyPair = (publicKey: SecKey, privateKey: SecKey)
     
     public init(passowrdString: String) {
             self.passowrdString = passowrdString
@@ -117,7 +118,7 @@ public class CryptoKitClass {
         senderSigningPrivateKey.publicKey.rawRepresentation
         //The rawRepresentation of the public key is of type Data, so you can send it over the network.
 
-        let data = "Data".data(using: .utf8)!
+        let data = passowrdString.data(using: .utf8)!
         let digest512 = SHA512.hash(data: data)
         let signatureForDigest = try! senderSigningPrivateKey.signature(
           for: Data(digest512))
@@ -142,12 +143,59 @@ public class CryptoKitClass {
     }
     
 //------------------------------------------------------------------------------
-/*----------------------KEY AGREEMENT PROTOCOL ALGO-----------------------------
+/*----------------------RSA ALGO-----------------------------
     
- A key agreement protocol is a process during which two parties securely choose a shared encryption key that can be used to sign and encrypt the data they want to share with each other. This also allows unauthorized parties to access the data.
+
     
-----------------------KEY AGREEMENT PROTOCOL ALGO-----------------------------*/
+----------------------RSA ALGO-----------------------------*/
     
+    
+    
+    public func generateKeyPair(publicKeyTag: String, privateKeyTag:String, keySize: Int) -> KeyPair?  {
+
+       // A key whose value indicates the item's private tag.
+        let privateAttributes = [String(kSecAttrIsPermanent): true,
+                                 String(kSecAttrApplicationTag): privateKeyTag] as [String : Any]
+        let publicAttributes = [String(kSecAttrIsPermanent): true,
+                                String(kSecAttrApplicationTag): publicKeyTag] as [String : Any]
+
+        let pairAttributes = [String(kSecAttrKeyType): kSecAttrKeyTypeRSA,
+                              String(kSecAttrKeySizeInBits): keySize,
+                              String(kSecPublicKeyAttrs): publicAttributes,
+                              String(kSecPrivateKeyAttrs): privateAttributes] as [String : Any]
+        var publicKey: SecKey?
+        var privateKey: SecKey?
+        let result = SecKeyGeneratePair(pairAttributes as CFDictionary, &publicKey, &privateKey)
+
+        if result != errSecSuccess {
+            return nil
+        }
+        return KeyPair(publicKey: publicKey!, privateKey: privateKey!)
+    }
+    
+    
+   public func callEncryptionUsingRSA(publicKey : SecKey, encryptData : String) -> Data {
+        
+        
+        var error: Unmanaged<CFError>?
+        let message = Data(encryptData.utf8)
+        let ciphertext = SecKeyCreateEncryptedData(publicKey, .rsaEncryptionPKCS1, message as CFData, &error)! as Data
+        
+        return ciphertext
+    }
+  
+  
+    
+   public func callDecryptionUsingRSA(encyrptedData: Data, privateKey: SecKey) -> String {
+        
+       
+        var error: Unmanaged<CFError>?
+        let plaintext = SecKeyCreateDecryptedData(privateKey, .rsaEncryptionPKCS1, encyrptedData as CFData, &error)! as Data
+        let decryptedText = String(data: plaintext, encoding: .utf8) ?? "Non UTF8"
+        return decryptedText
+    }
+  
+  
 
         // Common Password Format
         func formatPassword(_ password: Data) -> String {
