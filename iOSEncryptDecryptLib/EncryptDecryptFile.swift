@@ -143,11 +143,8 @@ public class CryptoKitClass {
     }
     
 //------------------------------------------------------------------------------
-/*----------------------RSA ALGO-----------------------------
-    
-
-    
-----------------------RSA ALGO-----------------------------*/
+/*------------------------------RSA ALGO-----------------------------
+--------------------------------RSA ALGO---------------------------------------*/
     
     
     
@@ -188,26 +185,23 @@ public class CryptoKitClass {
     
    public func callDecryptionUsingRSA(encyrptedData: Data, privateKey: SecKey) -> String {
         
-       
         var error: Unmanaged<CFError>?
         let plaintext = SecKeyCreateDecryptedData(privateKey, .rsaEncryptionPKCS1, encyrptedData as CFData, &error)! as Data
         let decryptedText = String(data: plaintext, encoding: .utf8) ?? "Non UTF8"
         return decryptedText
     }
-  
-  
 
         // Common Password Format
-        func formatPassword(_ password: Data) -> String {
-            var passwordString : String = password.map { String(format: "%02x", $0) }.joined()
+    func formatPassword(_ password: Data) -> String {
+        var passwordString : String = password.map { String(format: "%02x", $0) }.joined()
             // Add a dash after every 8 characters
-            var index = passwordString.index(passwordString.startIndex, offsetBy: 8)
-            repeat {
-                passwordString.insert("-", at: index)
-                passwordString.formIndex(&index, offsetBy: 9)
-            } while index < passwordString.endIndex
-            return passwordString
-        }
+        var index = passwordString.index(passwordString.startIndex, offsetBy: 8)
+        repeat {
+            passwordString.insert("-", at: index)
+            passwordString.formIndex(&index, offsetBy: 9)
+        } while index < passwordString.endIndex
+        return passwordString
+    }
     
     
 }
