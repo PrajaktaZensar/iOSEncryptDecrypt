@@ -100,7 +100,7 @@ public class CryptoKitClass {
      
     */
 
-    
+    // MARK: - AUTHENTICATION
         public func authenticateHmacSHA512CryptoKit() -> String? {
             // Create the hash
             let passwordData = passowrdString.data(using: .utf8)!
@@ -128,6 +128,7 @@ public class CryptoKitClass {
      
     */
     
+    // MARK: - HASHING
         public func hashSha512CryptoKit() -> String? {
             // Create the hash
             let passwordData = passowrdString.data(using: .utf8)!
@@ -159,7 +160,7 @@ public class CryptoKitClass {
      
     */
     
-    
+    // MARK: - CREATING SIGNATURE
     public func senderSignatureCurve25519() -> (Data, Data, SHA512Digest) {
         let senderSigningPrivateKey = Curve25519.Signing.PrivateKey()
        
@@ -189,6 +190,7 @@ public class CryptoKitClass {
     */
     
     
+    // MARK: - VERIFYING SIGNATURE
     public func receiverVerifySignatureCurve25519(publicKey : Data, signature: Data, SHA512Digest: SHA512Digest) -> Bool {
         
         let publicKeyVal = try! Curve25519.Signing.PublicKey(
@@ -218,7 +220,7 @@ public class CryptoKitClass {
 
      
     */
-    
+    // MARK: - GENERATING KEY PAIR
     
     public func generateKeyPair(publicKeyTag: String, privateKeyTag:String, keySize: Int) -> KeyPair?  {
 
@@ -277,7 +279,7 @@ public class CryptoKitClass {
      
     */
     
-    
+    // MARK: - RSA ENCRYPTION
    public func callEncryptionUsingRSA(publicKey : SecKey, messageData : String) -> Data {
         
         
@@ -304,6 +306,7 @@ public class CryptoKitClass {
      
     */
     
+    // MARK: - RSA DECRYPTION
    public func callDecryptionUsingRSA(encyrptedData: Data, privateKey: SecKey) -> String {
         
         var error: Unmanaged<CFError>?
@@ -312,6 +315,8 @@ public class CryptoKitClass {
         return decryptedText
     }
 
+    
+//-----------------------------------------------------------------------------------------
         // Common Password Format
     func formatPassword(_ password: Data) -> String {
         var passwordString : String = password.map { String(format: "%02x", $0) }.joined()
